@@ -1,8 +1,12 @@
 package com.appzum.objectdetection;
 
+import static org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY;
+import static org.opencv.imgproc.Imgproc.cvtColor;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
@@ -19,6 +23,13 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfFloat6;
+import org.opencv.core.MatOfRect;
+import org.opencv.core.Point;
+import org.opencv.core.Rect;
+import org.opencv.core.Scalar;
+import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.videoio.VideoCapture;
 
 import android.Manifest;
@@ -50,7 +61,9 @@ public class MainActivity extends AppCompatActivity {
 
         isStoragePermissionGranted();
 
-        Thread thread = new Thread(() -> {
+        // Realtime cam stream
+        /*Thread thread = new Thread(() -> {
+            Log.i(TAG, "onCreate: 1");
             // initLocal
             if (OpenCVLoader.initLocal()) {
                 Log.i(TAG, "OpenCV loaded successfully");
@@ -61,11 +74,13 @@ public class MainActivity extends AppCompatActivity {
             }
 
             //String videoUrl = "/storage/emulated/0/Download/ping_vid2.mp4";
-
+    
             String currentVideoChunk = videoChunkPath1;
             downloadNextPart(videoChunkPath1);
+            Log.i(TAG, "onCreate: 2");
 
             while (true) {
+                Log.i(TAG, "onCreate: 3");
 
                 Thread downloadThread;
                 if (currentVideoChunk.equals(videoChunkPath1)) {
@@ -78,16 +93,20 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
                 downloadThread.start();
+                Log.i(TAG, "onCreate: 4");
 
                 VideoCapture videoCapture = new VideoCapture();
                 videoCapture.open(currentVideoChunk);
+                Log.i(TAG, "onCreate: 5");
 
                 int framesCount = 0;
 
                 if (videoCapture.isOpened()) {
                     Mat frame = new Mat();
+                    Log.i(TAG, "onCreate: 6");
 
                     while (videoCapture.read(frame)) {
+                        Log.i(TAG, "onCreate: 7");
 
                         // Обработка каждого кадра с помощью машинного зрения
 
@@ -97,13 +116,21 @@ public class MainActivity extends AppCompatActivity {
 
                         // Отображение обработанного кадра
                         // Это только пример, ты можешь заменить эту часть кода на свою реализацию
-                        if (framesCount >= 150) continue;
+                        //if (framesCount >= 150) continue;
 
                         Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
                         Utils.matToBitmap(frame, bitmap);
 
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            if (bitmap.getColor(10, 10).toString().equals("Color(0.0, 0.6039216, 0.0, 1.0, sRGB IEC61966-2.1)") &&
+                                    bitmap.getColor(100, 100).toString().equals("Color(0.0, 0.6039216, 0.0, 1.0, sRGB IEC61966-2.1)")) {
+                                continue;
+                            }
+                        } else {
+                            if (framesCount >= 150) continue;
+                        }
+
                         // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
-                        Log.i(TAG, "onCreate: " + bitmap);
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
 
                         try {
@@ -132,6 +159,104 @@ public class MainActivity extends AppCompatActivity {
                     throw new RuntimeException(e);
                 }
 
+                videoCapture.release();
+
+            }
+
+        });
+
+        thread.start();*/
+
+        // From video
+        Thread thread = new Thread(() -> {
+            // initLocal
+            if (OpenCVLoader.initLocal()) {
+                Log.i(TAG, "OpenCV loaded successfully");
+            } else {
+                Log.e(TAG, "OpenCV initialization failed!");
+                return;
+            }
+
+            String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
+
+
+            InputStream is = getResources().openRawResource(R.raw.haarcascade_cars);
+            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+            File cascFile = new File(cascadeDir, "haarcascade_cars.xml");
+
+            FileOutputStream fos;
+            try {
+                fos = new FileOutputStream(cascFile);
+
+                byte buffer[] = new byte[4096];
+                int bytesRead;
+                while((bytesRead = is.read(buffer)) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                }
+
+                is.close();
+                fos.close();
+
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+
+            while (true) {
+
+                VideoCapture videoCapture = new VideoCapture();
+                videoCapture.open(videoUrl);
+
+                int framesCount = 0;
+
+                if (videoCapture.isOpened()) {
+                    Mat frame = new Mat();
+
+                    while (videoCapture.read(frame)) {
+
+                        //Log.i(TAG, "onCreate: " +  "android.resource://" + getPackageName() + "/" + "raw/haarcascade_cars.xml");
+                        CascadeClassifier car_cascade = new CascadeClassifier(cascFile.getAbsolutePath());
+
+                        if (!car_cascade.empty()) {
+                            Mat gray = new Mat();
+                            cvtColor(frame, gray, COLOR_BGR2GRAY);
+
+                            MatOfRect cars = new MatOfRect();
+
+                            car_cascade.detectMultiScale(gray, cars, 1.1, 1);
+
+                            for (Rect car : cars.toArray()) {
+                                //Log.i(TAG, "Rect: " + car.x + " " + car.y + " " + car.height + " " + car.width);
+                                Imgproc.rectangle(frame, car, new Scalar(255, 0, 0));
+                            }
+                        }
+
+
+
+                        Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
+                        Utils.matToBitmap(frame, bitmap);
+
+                        // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
+                        runOnUiThread(() -> screen.setImageBitmap(bitmap));
+
+                        try {
+                            Thread.sleep(25);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                        framesCount++;
+                    }
+
+                } else {
+                    // Обработка ошибки открытия видео
+                }
+
+
+                videoCapture.release();
+
             }
 
         });
@@ -148,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
 
                 Log.v(TAG, "Permission is revoked");
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 1);
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
                 return false;
             }
         } else { //permission is automatically granted on sdk<23 upon installation
@@ -159,7 +284,10 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void downloadNextPart(String videoChunkPath) {
+        // 720p
         String videoUrl = "https://rr5---sn-axq7sn7z.googlevideo.com/videoplayback?expire=1708461132&ei=7LfUZZymCruN_9EPkoyHuA8&ip=143.137.166.123&id=ybllmr12xXk.1&itag=247&aitags=242%2C243%2C244%2C247%2C248%2C271%2C278%2C313&source=yt_live_broadcast&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&spc=UWF9fySrqDXO3RhYiYms-idvzE_RJKxFNiDwPbLVt0xu9yo&vprv=1&live=1&hang=1&noclen=1&svpuc=1&mime=video%2Fwebm&gir=yes&keepalive=yes&fexp=24007246&c=ANDROID&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cxpc%2Cspc%2Cvprv%2Clive%2Chang%2Cnoclen%2Csvpuc%2Cmime%2Cgir&sig=AJfQdSswRAIgE2HGXtb0DtVjKAkK3Or9lwTcnchdeSrj5PrOgeL1WQMCIH3Bfyp0SeGzwQoeER3L4O5I9_lnAmNTLXynxAYgsY-m&redirect_counter=1&rm=sn-ab5ely7s&req_id=59fab8e5aafea3ee&cms_redirect=yes&cmsv=e&ipbypass=yes&mh=3D&mip=91.215.201.1&mm=44&mn=sn-axq7sn7z&ms=lva&mt=1708439789&mv=m&mvi=5&pl=24&lsparams=ipbypass,mh,mip,mm,mn,ms,mv,mvi,pl&lsig=APTiJQcwRgIhAMawyIdjj6PKun3g8ystD2uKFLyms4-gYRw9Udb6gOX-AiEAnMH6pno1od6jkpxgimgCzbOR6yV8grrv2p3yyH5_Zcw%3D";
+        // 480p
+        //String videoUrl = "https://rr5---sn-axq7sn7z.googlevideo.com/videoplayback?expire=1708461132&ei=7LfUZZymCruN_9EPkoyHuA8&ip=143.137.166.123&id=ybllmr12xXk.1&itag=244&aitags=242%2C243%2C244%2C247%2C248%2C271%2C278%2C313&source=yt_live_broadcast&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&spc=UWF9fySrqDXO3RhYiYms-idvzE_RJKxFNiDwPbLVt0xu9yo&vprv=1&live=1&hang=1&noclen=1&svpuc=1&mime=video%2Fwebm&gir=yes&keepalive=yes&fexp=24007246&c=ANDROID&sparams=expire%2Cei%2Cip%2Cid%2Caitags%2Csource%2Crequiressl%2Cxpc%2Cspc%2Cvprv%2Clive%2Chang%2Cnoclen%2Csvpuc%2Cmime%2Cgir&sig=AJfQdSswRgIhAI7-ZoaT-tQuu3BDsZuBs-gsJhAe7Ul1czJNAHExoutaAiEAgtce1vfUQ_R-0KqTLq9U3rpLhD6f0Omz317YdtTvba8%3D&redirect_counter=1&rm=sn-ab5ely7s&req_id=5960ed886008a3ee&cms_redirect=yes&cmsv=e&ipbypass=yes&mh=3D&mip=91.215.201.1&mm=44&mn=sn-axq7sn7z&ms=lva&mt=1708447712&mv=m&mvi=5&pl=24&lsparams=ipbypass,mh,mip,mm,mn,ms,mv,mvi,pl&lsig=APTiJQcwRgIhAKiI_nE-lOasR8GQDsnWHpt7heXDUnhmS4VQF71e9Nl8AiEA4bcumQzSrQnEy6Gy9U2ywixiKwK9DUhKdGnBBN-Ghng%3D";
 
         try {
             URL u = new URL(videoUrl);
@@ -169,7 +297,7 @@ public class MainActivity extends AppCompatActivity {
         byte[] buffer = new byte[1024];
         int length;
 
-        FileOutputStream fos = new FileOutputStream(new File(videoChunkPath));
+        FileOutputStream fos = new FileOutputStream(videoChunkPath);
         while ((length = dis.read(buffer)) > 0) {
             fos.write(buffer, 0, length);
         }
