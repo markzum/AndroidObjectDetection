@@ -23,6 +23,8 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfDouble;
+import org.opencv.core.MatOfFloat;
 import org.opencv.core.MatOfFloat6;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
@@ -30,6 +32,7 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.HOGDescriptor;
 import org.opencv.videoio.VideoCapture;
 
 import android.Manifest;
@@ -216,21 +219,19 @@ public class MainActivity extends AppCompatActivity {
 
                     while (videoCapture.read(frame)) {
 
-                        //Log.i(TAG, "onCreate: " +  "android.resource://" + getPackageName() + "/" + "raw/haarcascade_cars.xml");
-                        CascadeClassifier car_cascade = new CascadeClassifier(cascFile.getAbsolutePath());
+                        HOGDescriptor hog = new HOGDescriptor();
+                        //Получаем стандартный определитель людей и устанавливаем его нашему дескриптору
+                        MatOfFloat descriptors = HOGDescriptor.getDefaultPeopleDetector();
+                        hog.setSVMDetector(descriptors);
+                        // Определяем переменные, в которые будут помещены результаты поиска ( locations - прямоугольные области, weights - вес (можно сказать релевантность) соответствующей локации)
+                        MatOfRect locations = new MatOfRect();
+                        MatOfDouble weights = new MatOfDouble();
+                        // Собственно говоря, сам анализ фотографий. Результаты запишутся в locations и weights
+                        hog.detectMultiScale(frame, locations, weights);
 
-                        if (!car_cascade.empty()) {
-                            Mat gray = new Mat();
-                            cvtColor(frame, gray, COLOR_BGR2GRAY);
-
-                            MatOfRect cars = new MatOfRect();
-
-                            car_cascade.detectMultiScale(gray, cars, 1.1, 1);
-
-                            for (Rect car : cars.toArray()) {
-                                //Log.i(TAG, "Rect: " + car.x + " " + car.y + " " + car.height + " " + car.width);
-                                Imgproc.rectangle(frame, car, new Scalar(255, 0, 0));
-                            }
+                        for (Rect car : locations.toArray()) {
+                            //Log.i(TAG, "Rect: " + car.x + " " + car.y + " " + car.height + " " + car.width);
+                            Imgproc.rectangle(frame, car, new Scalar(255, 0, 0));
                         }
 
 
@@ -241,11 +242,11 @@ public class MainActivity extends AppCompatActivity {
                         // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
 
-                        try {
+                        /*try {
                             Thread.sleep(25);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
-                        }
+                        }*/
 
                         framesCount++;
                     }
