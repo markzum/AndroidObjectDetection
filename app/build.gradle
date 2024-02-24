@@ -26,6 +26,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    externalNativeBuild {
+        cmake {
+            version "3.22.1"
+            path file('src/main/jni/CMakeLists.txt')
+        }
+    }
 }
 
 dependencies {

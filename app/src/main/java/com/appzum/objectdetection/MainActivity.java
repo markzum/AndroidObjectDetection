@@ -45,6 +45,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 
@@ -219,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
 
                     while (videoCapture.read(frame)) {
 
-                        HOGDescriptor hog = new HOGDescriptor();
+                        /*HOGDescriptor hog = new HOGDescriptor();
                         //Получаем стандартный определитель людей и устанавливаем его нашему дескриптору
                         MatOfFloat descriptors = HOGDescriptor.getDefaultPeopleDetector();
                         hog.setSVMDetector(descriptors);
@@ -232,21 +234,35 @@ public class MainActivity extends AppCompatActivity {
                         for (Rect car : locations.toArray()) {
                             //Log.i(TAG, "Rect: " + car.x + " " + car.y + " " + car.height + " " + car.width);
                             Imgproc.rectangle(frame, car, new Scalar(255, 0, 0));
-                        }
+                        }*/
+
+
+                        Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
+                        //yolov8ncnn.detect(frame.getNativeObjAddr());
+                            //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
+                        /*Log.i(TAG, "FrameNum: " + framesCount);
+                        Bitmap nb = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
+                        Log.i(TAG, "onCreate: " + );
+                        //nb.setPixels(yolov8ncnn.detect(frame.getNativeObjAddr()), 0, frame.cols(), 0, 0, frame.cols(), frame.rows());
+
+                        Mat processed_frame = frame;
+                        long x = 100;*/
 
 
 
                         Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
                         Utils.matToBitmap(frame, bitmap);
 
+                        yolov8ncnn.detect(bitmap, bitmap, 5);
+
                         // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
 
-                        /*try {
+                        try {
                             Thread.sleep(25);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
-                        }*/
+                        }
 
                         framesCount++;
                     }
@@ -309,5 +325,11 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void onLowMemory() {
+        Log.i(TAG, "onLowMemory: onLowMemory!!!");
+        super.onLowMemory();
     }
 }
