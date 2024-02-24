@@ -317,10 +317,12 @@ int Yolo::detect(const cv::Mat& rgb, std::vector<Object>& objects, float prob_th
     nms_sorted_bboxes(proposals, picked, nms_threshold);
 
     int count = picked.size();
+    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "y detect count %d", count);
 
     objects.resize(count);
     for (int i = 0; i < count; i++)
     {
+        __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "y detect i: %d", i);
         objects[i] = proposals[picked[i]];
 
         // adjust offset to original unpadded

@@ -354,8 +354,8 @@ JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_loadModel(
 
     const int target_sizes[] =
     {
-        320,
-        320,
+        640,
+        640,
     };
 
     const float mean_vals[][3] =
@@ -388,6 +388,9 @@ JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_loadModel(
         {
             if (!g_yolo)
                 g_yolo = new Yolo;
+
+            //__android_log_print(ANDROID_LOG_DEBUG, "ncnn",
+//                                "loadModel: %s %d %s %s %s", modeltype, target_size, mean_vals[(int)modelid], norm_vals[(int)modelid], use_gpu);
             g_yolo->load(mgr, modeltype, target_size, mean_vals[(int)modelid], norm_vals[(int)modelid], use_gpu);
         }
     }
@@ -430,7 +433,7 @@ JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_setOutputW
     return JNI_TRUE;
 }
 
-JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect(JNIEnv* env, jobject thiz, jobject bitmapIn, jobject bitmapOut, jfloat sigma)
+JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv* env, jobject thiz, jlong matIn, jobject bitmapOut)
 {
 
     //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "setOutputWindow %p", frame);
@@ -461,9 +464,60 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect(JNIEnv*
 //    test_foo(frame);
 //    int res[frame->cols * frame->rows];
 //    res[2] = 444;
-    cv::Mat src;
-    bitmapToMat(env, bitmapIn, src, false);
-    GaussianBlur(src, src, cv::Size(), sigma);
+
+    //g_yolo = new Yolo;
+    //g_yolo->load(mgr, modeltype, target_size, mean_vals[(int)modelid], norm_vals[(int)modelid], use_gpu);
+
+    //cv::Mat src;
+    //bitmapToMat(env, bitmapIn, src, false);
+    cv::Mat& src = * (cv::Mat*) matIn;
+
+
+//    std::vector<Object> objects;
+//    g_yolo->detect(src, objects, 0.3, 0.3);
+
+    /*__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob 1");
+    for (int i = 0; i <= objects.size(); i++) {
+        __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob: %f", objects[i].prob);
+    }
+    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob 2");*/
+
+//    g_yolo->draw(src, objects);
+    {
+        ncnn::MutexLockGuard g(lock);
+
+        if (g_yolo)
+        {
+            std::vector<Object> objects;
+            g_yolo->detect(src, objects);
+
+            /*for (int i = 0; i < objects.size(); ++i) {
+                //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1 %d", objects[i].label);
+                __android_log_print(ANDROID_LOG_DEBUG, "ncnn",
+                                    "detected obj: %f %f %f %f",
+                                    objects[i].rect.x, objects[i].rect.y, objects[i].rect.width, objects[i].rect.height);
+            }*/
+
+            g_yolo->draw(src, objects);
+        }
+        else
+        {
+            draw_unsupported(src);
+        }
+    }
+    /*__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1");
+    std::vector<Object> objects;
+    g_yolo->detect(src, objects);
+    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection2");
+
+    g_yolo->draw(src, objects);
+    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection3");
+
+    draw_fps(src);
+    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection4");*/
+
+
+
     matToBitmap(env, src, bitmapOut, false);
 }
 

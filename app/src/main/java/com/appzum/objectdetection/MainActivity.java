@@ -7,7 +7,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,6 +32,9 @@ import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
+import org.opencv.dnn.Dnn;
+import org.opencv.dnn.Net;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.objdetect.HOGDescriptor;
@@ -37,6 +42,7 @@ import org.opencv.videoio.VideoCapture;
 
 import android.Manifest;
 
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -65,6 +71,8 @@ public class MainActivity extends AppCompatActivity {
         ImageView screen = findViewById(R.id.imageView);
 
         isStoragePermissionGranted();
+
+//        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
 
         // Realtime cam stream
         /*Thread thread = new Thread(() -> {
@@ -185,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
             String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
 
 
-            InputStream is = getResources().openRawResource(R.raw.haarcascade_cars);
+            /*InputStream is = getResources().openRawResource(R.raw.haarcascade_cars);
             File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
             File cascFile = new File(cascadeDir, "haarcascade_cars.xml");
 
@@ -206,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
                 throw new RuntimeException(e);
             } catch (IOException e) {
                 throw new RuntimeException(e);
-            }
+            }*/
 
 
             while (true) {
@@ -218,6 +226,9 @@ public class MainActivity extends AppCompatActivity {
 
                 if (videoCapture.isOpened()) {
                     Mat frame = new Mat();
+
+                    Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
+                    yolov8ncnn.loadModel(getAssets(), 1, 0);
 
                     while (videoCapture.read(frame)) {
 
@@ -237,7 +248,6 @@ public class MainActivity extends AppCompatActivity {
                         }*/
 
 
-                        Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
                         //yolov8ncnn.detect(frame.getNativeObjAddr());
                             //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
                         /*Log.i(TAG, "FrameNum: " + framesCount);
@@ -248,21 +258,23 @@ public class MainActivity extends AppCompatActivity {
                         Mat processed_frame = frame;
                         long x = 100;*/
 
+                        /*Size sz = new Size(720,720);
+                        Imgproc.resize(frame, frame, sz);*/
 
 
                         Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
-                        Utils.matToBitmap(frame, bitmap);
+//                        Utils.matToBitmap(frame, bitmap);
 
-                        yolov8ncnn.detect(bitmap, bitmap, 5);
+                        yolov8ncnn.detect2(frame.getNativeObjAddr(), bitmap);
 
                         // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
 
-                        try {
+                        /*try {
                             Thread.sleep(25);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
-                        }
+                        }*/
 
                         framesCount++;
                     }
@@ -331,5 +343,27 @@ public class MainActivity extends AppCompatActivity {
     public void onLowMemory() {
         Log.i(TAG, "onLowMemory: onLowMemory!!!");
         super.onLowMemory();
+    }
+
+    private String getAssetsPath(String file) {
+        AssetManager assetManager = getAssets();
+        BufferedInputStream inputStream;
+        try {
+            // read the defined data from assets
+            inputStream = new BufferedInputStream(assetManager.open(file));
+            byte[] data = new byte[inputStream.available()];
+            inputStream.read(data);
+            inputStream.close();
+            // Create copy file in storage.
+            File outFile = new File(getFilesDir(), file);
+            FileOutputStream os = new FileOutputStream(outFile);
+            os.write(data);
+            os.close();
+            // Return a path to file which may be read in common way.
+            return outFile.getAbsolutePath();
+        } catch (IOException ex) {
+            Log.i(TAG, "Failed to upload a file");
+        }
+        return "";
     }
 }
