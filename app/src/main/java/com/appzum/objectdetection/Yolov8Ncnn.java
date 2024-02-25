@@ -12,6 +12,7 @@ public class Yolov8Ncnn {
     public native boolean openCamera(int facing);
     public native boolean closeCamera();
     public native boolean setOutputWindow(Surface surface);
+    public native DetectObject[] detect(long matIn);
     public native void detect2(long matIn, Bitmap bitmapOut);
 
     static {

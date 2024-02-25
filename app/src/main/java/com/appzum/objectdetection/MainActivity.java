@@ -2,6 +2,7 @@ package com.appzum.objectdetection;
 
 import static org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY;
 import static org.opencv.imgproc.Imgproc.cvtColor;
+import static org.opencv.imgproc.Imgproc.rectangle;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -38,6 +39,8 @@ import org.opencv.dnn.Net;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.objdetect.HOGDescriptor;
+import org.opencv.video.Tracker;
+import org.opencv.video.TrackerMIL;
 import org.opencv.videoio.VideoCapture;
 
 import android.Manifest;
@@ -51,6 +54,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
@@ -222,15 +226,54 @@ public class MainActivity extends AppCompatActivity {
                 VideoCapture videoCapture = new VideoCapture();
                 videoCapture.open(videoUrl);
 
-                int framesCount = 0;
-
                 if (videoCapture.isOpened()) {
                     Mat frame = new Mat();
+
+                    int framesCount = 30;
 
                     Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
                     yolov8ncnn.loadModel(getAssets(), 1, 0);
 
+                    ArrayList<DetectObject> objects = new ArrayList<>();
+
                     while (videoCapture.read(frame)) {
+
+//                        ArrayList<DetectObject> objects = new ArrayList<>();
+                        if (framesCount >= 30) {
+                            Log.i(TAG, "Detect!");
+                            DetectObject[] detectObjects = yolov8ncnn.detect(frame.getNativeObjAddr());
+
+                            objects.clear();
+
+                            for (DetectObject detectObject : detectObjects) {
+
+                                DetectObject new_object = new DetectObject(
+                                        detectObject.label, detectObject.prob, detectObject.rect);
+
+                                TrackerMIL tracker = TrackerMIL.create();
+                                tracker.init(frame, detectObject.rect);
+                                new_object.setTracker(tracker);
+
+                                objects.add(new_object);
+                            }
+
+                            framesCount = 0;
+                        } else {
+                            /*Log.i(TAG, "Update Trackers!");
+                            for (DetectObject object : objects) {
+                                object.tracker.update(frame, object.rect);
+                            }*/
+                            int j = 10;
+                            objects.get(j).tracker.update(frame, objects.get(j).rect);
+                        }
+
+
+                        Log.i(TAG, "Draw!");
+                        // Draw objects rects
+                        for (DetectObject object : objects) {
+                            rectangle(frame, object.rect, new Scalar(object.getColor()), 3);
+                        }
+
 
                         /*HOGDescriptor hog = new HOGDescriptor();
                         //Получаем стандартный определитель людей и устанавливаем его нашему дескриптору
@@ -263,9 +306,10 @@ public class MainActivity extends AppCompatActivity {
 
 
                         Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
-//                        Utils.matToBitmap(frame, bitmap);
+                        Utils.matToBitmap(frame, bitmap);
 
-                        yolov8ncnn.detect2(frame.getNativeObjAddr(), bitmap);
+//                        yolov8ncnn.detect2(frame.getNativeObjAddr(), bitmap);
+//                        Log.i(TAG, "onCreate: " + Arrays.toString(yolov8ncnn.detect(frame.getNativeObjAddr())));
 
                         // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));

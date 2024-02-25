@@ -287,7 +287,7 @@ void matToBitmap(JNIEnv* env, cv::Mat src, jobject bitmap, jboolean needPremulti
     }
     AndroidBitmap_unlockPixels(env, bitmap);
     return bitmap;
-    /*} catch (cv::Exception e) {
+    / *} catch (cv::Exception e) {
         AndroidBitmap_unlockPixels(env, bitmap);
         jclass je = env->FindClass("org/opencv/core/CvException");
         if (!je) je = env->FindClass("java/lang/Exception");
@@ -433,9 +433,37 @@ JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_setOutputW
     return JNI_TRUE;
 }
 
+
+
+int framesCount = 0;
+
+JNIEXPORT jobjectArray JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect(JNIEnv* env, jobject thiz, jlong matIn)
+{
+    cv::Mat& src = * (cv::Mat*) matIn;
+    std::vector<Object> objects;
+    {
+        ncnn::MutexLockGuard g(lock);
+        {
+            g_yolo->detect(src, objects);
+        }
+    }
+
+    // translate std::vector<Object> to jobjectArray
+    jclass cls = env->FindClass("com/appzum/objectdetection/DetectObject");
+    jobjectArray result = env->NewObjectArray(objects.size(), cls, NULL);
+    for (size_t i = 0; i < objects.size(); i++)
+    {
+        Object& obj = objects[i];
+        jobject obj_result = env->NewObject(cls, env->GetMethodID(cls, "<init>", "(IFIIII)V"),
+                                            obj.label, obj.prob, (int)obj.rect.x, (int)obj.rect.y, (int)obj.rect.width, (int)obj.rect.height);
+        env->SetObjectArrayElement(result, i, obj_result);
+    }
+    return result;
+}
+
 JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv* env, jobject thiz, jlong matIn, jobject bitmapOut)
 {
-
+    std::vector<Object> objects;
     //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "setOutputWindow %p", frame);
 
     //jclass Mat = env->FindClass("org/opencv/core/Mat");
@@ -472,6 +500,8 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv
     //bitmapToMat(env, bitmapIn, src, false);
     cv::Mat& src = * (cv::Mat*) matIn;
 
+//    cv::Ptr<cv::Tracker> tracker = cv::TrackerMIL::create();
+
 
 //    std::vector<Object> objects;
 //    g_yolo->detect(src, objects, 0.3, 0.3);
@@ -488,17 +518,24 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv
 
         if (g_yolo)
         {
-            std::vector<Object> objects;
-            g_yolo->detect(src, objects);
 
-            /*for (int i = 0; i < objects.size(); ++i) {
-                //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1 %d", objects[i].label);
-                __android_log_print(ANDROID_LOG_DEBUG, "ncnn",
-                                    "detected obj: %f %f %f %f",
-                                    objects[i].rect.x, objects[i].rect.y, objects[i].rect.width, objects[i].rect.height);
-            }*/
+            if (framesCount >= 10) {
+                g_yolo->detect(src, objects);
 
-            g_yolo->draw(src, objects);
+                for (int i = 0; i < objects.size(); ++i) {
+                    //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1 %d", objects[i].label);
+                    //__android_log_print(ANDROID_LOG_DEBUG, "ncnn",
+                    //                    "detected obj: %f %f %f %f",
+                    //                    objects[i].rect.x, objects[i].rect.y, objects[i].rect.width, objects[i].rect.height);
+                }
+
+                g_yolo->draw(src, objects);
+
+                framesCount = 0;
+            } else {
+                framesCount++;
+            }
+
         }
         else
         {
