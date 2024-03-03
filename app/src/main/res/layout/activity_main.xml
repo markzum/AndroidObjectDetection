@@ -50,4 +50,21 @@
             android:src="@drawable/directions_walk_24" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:padding="5dp">
+
+        <ImageView
+            android:id="@+id/settingsBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/settings_24" />
+
+    </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

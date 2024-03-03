@@ -5,6 +5,8 @@ import static org.opencv.imgproc.Imgproc.resize;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -47,6 +49,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MainActivity extends AppCompatActivity {
 
     final String TAG = "markzum";
+
+    ImageView screen;
+
+    boolean isVideoCapturing = true;
+
     String videoChunkPath1 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream1.webm";
     String videoChunkPath2 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream2.webm";
 
@@ -70,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
         ImageView trackAllBtn = findViewById(R.id.trackAllBtn);
         ImageView trackCarsBtn = findViewById(R.id.trackCarsBtn);
         ImageView trackPeopleBtn = findViewById(R.id.trackPeopleBtn);
+        ImageView settingsBtn = findViewById(R.id.settingsBtn);
 
         trackAllBtn.setOnClickListener(v -> {
             isOneObjectTracking.set(false);
@@ -86,8 +94,12 @@ public class MainActivity extends AppCompatActivity {
             isOnlyCarsTracking = false;
             isOnlyPeopleTracking = true;
         });
+        settingsBtn.setOnClickListener(v -> {
+//            finish();
+            startActivity(new Intent(this, SettingsActivity.class));
+        });
 
-        ImageView screen = findViewById(R.id.videoPlayer);
+        screen = findViewById(R.id.videoPlayer);
 
         isStoragePermissionGranted();
 
@@ -199,8 +211,15 @@ public class MainActivity extends AppCompatActivity {
         });
 
         thread.start();*/
+    }
 
-        // From video
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        isVideoCapturing = true;
+
         @SuppressLint("ClickableViewAccessibility") Thread thread = new Thread(() -> {
             // initLocal
             if (OpenCVLoader.initDebug()) {
@@ -237,7 +256,7 @@ public class MainActivity extends AppCompatActivity {
             }*/
 
 
-            while (true) {
+            while (isVideoCapturing) {
 
                 VideoCapture videoCapture = new VideoCapture();
                 videoCapture.open(videoUrl);
@@ -247,8 +266,13 @@ public class MainActivity extends AppCompatActivity {
 
                     int framesCount = 0;
 
+                    // get model from shared preferences
+                    SharedPreferences sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
+                    int yoloModel = sharedPreferences.getInt("yoloModel", 0);
+                    boolean isGPU = sharedPreferences.getBoolean("isGPU", false);
+
                     Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
-                    yolov8ncnn.loadModel(getAssets(), 1, 1);
+                    yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0);
 
                     ArrayList<DetectObject> objects = new ArrayList<>();
 
@@ -286,7 +310,7 @@ public class MainActivity extends AppCompatActivity {
                     int windowHeight = displayMetrics.heightPixels;
                     int windowWidth = displayMetrics.widthPixels;
 
-                    while (videoCapture.read(frame)) {
+                    while (videoCapture.read(frame) && isVideoCapturing) {
                         // Resize frame to phone window size. Save aspect ratio
                         int frameHeight = frame.rows();
                         int frameWidth = frame.cols();
@@ -344,7 +368,8 @@ public class MainActivity extends AppCompatActivity {
                             if (isOnlyCarsTracking &&
                                     !object.getLabelName().equals("car") &&
                                     !object.getLabelName().equals("truck")) continue;
-                            if (isOnlyPeopleTracking && !object.getLabelName().equals("person")) continue;
+                            if (isOnlyPeopleTracking && !object.getLabelName().equals("person"))
+                                continue;
                             if (!object.isVisible()) continue;
 
                             rectangle(frame, new Point(object.rect.x, object.rect.y),
@@ -386,17 +411,7 @@ public class MainActivity extends AppCompatActivity {
                         Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
                         Utils.matToBitmap(frame, bitmap);
 
-//                        yolov8ncnn.detect2(frame.getNativeObjAddr(), bitmap);
-//                        Log.i(TAG, "onCreate: " + Arrays.toString(yolov8ncnn.detect(frame.getNativeObjAddr())));
-
-                        // Отображение bitmap в ImageView или другом компоненте пользовательского интерфейса
                         runOnUiThread(() -> screen.setImageBitmap(bitmap));
-
-                        /*try {
-                            Thread.sleep(25);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }*/
 
                         framesCount++;
                     }
@@ -413,6 +428,14 @@ public class MainActivity extends AppCompatActivity {
         });
 
         thread.start();
+    }
+
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        isVideoCapturing = false;
+        Log.i(TAG, "onStop: 11");
     }
 
     public boolean isStoragePermissionGranted() {

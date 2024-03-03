@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ObjectDetection</string>
+    <string name="use_gpu">Использовать GPU</string>
 </resources>
