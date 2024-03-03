@@ -335,7 +335,7 @@ JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved)
 }
 
 // public native boolean loadModel(AssetManager mgr, int modelid, int cpugpu);
-JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_loadModel(JNIEnv* env, jobject thiz, jobject assetManager, jint modelid, jint cpugpu)
+JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_loadModel(JNIEnv* env, jobject thiz, jobject assetManager, jint modelid, jint cpugpu, jint _target_size)
 {
     if (modelid < 0 || modelid > 6 || cpugpu < 0 || cpugpu > 1)
     {
@@ -354,8 +354,8 @@ JNIEXPORT jboolean JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_loadModel(
 
     const int target_sizes[] =
     {
-        640,
-        640,
+        _target_size,
+        _target_size,
     };
 
     const float mean_vals[][3] =
@@ -466,53 +466,9 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv
     std::vector<Object> objects;
     //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "setOutputWindow %p", frame);
 
-    //jclass Mat = env->FindClass("org/opencv/core/Mat");
-//    cv::Mat* frame  = (cv::Mat*) input_frame;
-//    ncnn::MutexLockGuard g(lock);
-
-//    cv::Mat* frame = (cv::Mat*) input_frame;
-
-    /*jclass matClass = env->FindClass("org/opencv/core/Mat");
-    jmethodID matInit = env->GetMethodID(
-            matClass, "<init>", "(J)V");*/
-
-    /*jobject bm = mat_to_bitmap(env, *frame, false);
-
-    jclass java_bitmap_class = (jclass) env->FindClass("android/graphics/Bitmap");
-    jmethodID m = env->GetMethodID(java_bitmap_class, "getPixels", "([IIIIIII)V");
-
-    //jclass java_int_arr_class = (jclass) env->FindClass("android/graphics/Bitmap");
-    //jintArray *res = new jintArray();
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection 1");
-    int res[frame->cols * frame->rows];
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection 2");
-    env->CallVoidMethod(bm, m, reinterpret_cast<jintArray>(res), 0, frame->cols, 0, 0, frame->cols, frame->rows);
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection 3");*/
-
-//    test_foo(frame);
-//    int res[frame->cols * frame->rows];
-//    res[2] = 444;
-
-    //g_yolo = new Yolo;
-    //g_yolo->load(mgr, modeltype, target_size, mean_vals[(int)modelid], norm_vals[(int)modelid], use_gpu);
-
-    //cv::Mat src;
-    //bitmapToMat(env, bitmapIn, src, false);
     cv::Mat& src = * (cv::Mat*) matIn;
 
-//    cv::Ptr<cv::Tracker> tracker = cv::TrackerMIL::create();
 
-
-//    std::vector<Object> objects;
-//    g_yolo->detect(src, objects, 0.3, 0.3);
-
-    /*__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob 1");
-    for (int i = 0; i <= objects.size(); i++) {
-        __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob: %f", objects[i].prob);
-    }
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "prob 2");*/
-
-//    g_yolo->draw(src, objects);
     {
         ncnn::MutexLockGuard g(lock);
 
@@ -523,10 +479,6 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv
                 g_yolo->detect(src, objects);
 
                 for (int i = 0; i < objects.size(); ++i) {
-                    //__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1 %d", objects[i].label);
-                    //__android_log_print(ANDROID_LOG_DEBUG, "ncnn",
-                    //                    "detected obj: %f %f %f %f",
-                    //                    objects[i].rect.x, objects[i].rect.y, objects[i].rect.width, objects[i].rect.height);
                 }
 
                 g_yolo->draw(src, objects);
@@ -542,18 +494,6 @@ JNIEXPORT void JNICALL Java_com_appzum_objectdetection_Yolov8Ncnn_detect2(JNIEnv
             draw_unsupported(src);
         }
     }
-    /*__android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection1");
-    std::vector<Object> objects;
-    g_yolo->detect(src, objects);
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection2");
-
-    g_yolo->draw(src, objects);
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection3");
-
-    draw_fps(src);
-    __android_log_print(ANDROID_LOG_DEBUG, "ncnn", "detection4");*/
-
-
 
     matToBitmap(env, src, bitmapOut, false);
 }

@@ -5,6 +5,7 @@ import static org.opencv.imgproc.Imgproc.resize;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -232,13 +233,13 @@ public class MainActivity extends AppCompatActivity {
             String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
 
 
-            /*InputStream is = getResources().openRawResource(R.raw.haarcascade_cars);
-            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-            File cascFile = new File(cascadeDir, "haarcascade_cars.xml");
+            /*InputStream is = getResources().openRawResource(R.raw.cam_vid_1);
+            File videoDir = getDir("videos", Context.MODE_PRIVATE);
+            File vidFile = new File(videoDir, "cam_vid_1.mp4");
 
             FileOutputStream fos;
             try {
-                fos = new FileOutputStream(cascFile);
+                fos = new FileOutputStream(vidFile);
 
                 byte buffer[] = new byte[4096];
                 int bytesRead;
@@ -259,7 +260,7 @@ public class MainActivity extends AppCompatActivity {
             while (isVideoCapturing) {
 
                 VideoCapture videoCapture = new VideoCapture();
-                videoCapture.open(videoUrl);
+                videoCapture.open(getAssetsPath("cam_vid_1.mp4"));
 
                 if (videoCapture.isOpened()) {
                     Mat frame = new Mat();
@@ -270,9 +271,10 @@ public class MainActivity extends AppCompatActivity {
                     SharedPreferences sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
                     int yoloModel = sharedPreferences.getInt("yoloModel", 0);
                     boolean isGPU = sharedPreferences.getBoolean("isGPU", false);
+                    int targetSize = sharedPreferences.getInt("targetSize", 640);
 
                     Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
-                    yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0);
+                    yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0, targetSize);
 
                     ArrayList<DetectObject> objects = new ArrayList<>();
 
@@ -507,6 +509,7 @@ public class MainActivity extends AppCompatActivity {
             // Return a path to file which may be read in common way.
             return outFile.getAbsolutePath();
         } catch (IOException ex) {
+            Log.i(TAG, "getAssetsPath: " + ex);
             Log.i(TAG, "Failed to upload a file");
         }
         return "";

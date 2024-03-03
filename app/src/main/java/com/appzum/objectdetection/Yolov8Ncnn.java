@@ -8,7 +8,7 @@ import org.opencv.core.Mat;
 
 
 public class Yolov8Ncnn {
-    public native boolean loadModel(AssetManager mgr, int modelid, int cpugpu);
+    public native boolean loadModel(AssetManager mgr, int modelid, int cpugpu, int _target_size);
     public native boolean openCamera(int facing);
     public native boolean closeCamera();
     public native boolean setOutputWindow(Surface surface);
