@@ -52,13 +52,17 @@ public class DetectObject {
         return colors[id];
     }
 
+    public static int lostThreshold = 2;
+
 
 
     /* Object */
     public int label;
     public float prob;
     public Rect rect;
-    public Tracker tracker;
+    public boolean tracking;
+    public int lostCount = 0;
+    public boolean visible = true;
 
     public DetectObject(int label, float prob, int x, int y, int width, int height) {
         this.label = label;
@@ -86,7 +90,31 @@ public class DetectObject {
         return getColorByClassId(label);
     }
 
-    public void setTracker(Tracker tracker) {
-        this.tracker = tracker;
+    public boolean isTracking() {
+        return tracking;
+    }
+
+    public void setTracking(boolean tracking) {
+        this.tracking = tracking;
+    }
+
+    public int getLostCount() {
+        return lostCount;
+    }
+
+    public void setLostCount(int lostCount) {
+        this.lostCount = lostCount;
+    }
+
+    public void addLostCount() {
+        this.lostCount++;
+    }
+
+    public boolean isVisible() {
+        return visible;
+    }
+
+    public void setVisible(boolean visible) {
+        this.visible = visible;
     }
 }

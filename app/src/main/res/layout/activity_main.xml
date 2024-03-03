@@ -7,12 +7,47 @@
     tools:context=".MainActivity">
 
 
+    <!-- android:adjustViewBounds="true"
+        android:scaleType="centerCrop" -->
     <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:id="@+id/videoPlayer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:scaleType="centerCrop"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="5dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/trackAllBtn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/globe_24" />
+
+        <ImageView
+            android:id="@+id/trackCarsBtn"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="10dp"
+            android:src="@drawable/directions_car_24" />
+
+        <ImageView
+            android:id="@+id/trackPeopleBtn"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="10dp"
+            android:src="@drawable/directions_walk_24" />
+    </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,13 +1,10 @@
 package com.appzum.objectdetection;
 
-import static org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY;
-import static org.opencv.imgproc.Imgproc.cvtColor;
 import static org.opencv.imgproc.Imgproc.rectangle;
+import static org.opencv.imgproc.Imgproc.resize;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-
-import android.content.Context;
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
@@ -15,35 +12,23 @@ import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.SurfaceView;
+import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageView;
-import android.widget.Toast;
 
-import org.opencv.android.CameraActivity;
-import org.opencv.android.CameraBridgeViewBase;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfDouble;
-import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfFloat6;
-import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
-import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
-import org.opencv.dnn.Dnn;
-import org.opencv.dnn.Net;
-import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
-import org.opencv.objdetect.HOGDescriptor;
-import org.opencv.video.Tracker;
-import org.opencv.video.TrackerMIL;
 import org.opencv.videoio.VideoCapture;
-
-import android.Manifest;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -56,9 +41,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 // AppCompatActivity, CameraActivity
 public class MainActivity extends AppCompatActivity {
@@ -67,16 +50,49 @@ public class MainActivity extends AppCompatActivity {
     String videoChunkPath1 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream1.webm";
     String videoChunkPath2 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream2.webm";
 
+    boolean isOnlyCarsTracking = false;
+    boolean isOnlyPeopleTracking = false;
+    AtomicBoolean isOneObjectTracking = new AtomicBoolean(false);
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        this.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        View decorView = getWindow().getDecorView();
+        int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        decorView.setSystemUiVisibility(uiOptions);
+
         setContentView(R.layout.activity_main);
 
-        ImageView screen = findViewById(R.id.imageView);
+        ImageView trackAllBtn = findViewById(R.id.trackAllBtn);
+        ImageView trackCarsBtn = findViewById(R.id.trackCarsBtn);
+        ImageView trackPeopleBtn = findViewById(R.id.trackPeopleBtn);
+
+        trackAllBtn.setOnClickListener(v -> {
+            isOneObjectTracking.set(false);
+            isOnlyCarsTracking = false;
+            isOnlyPeopleTracking = false;
+        });
+        trackCarsBtn.setOnClickListener(v -> {
+            isOneObjectTracking.set(false);
+            isOnlyCarsTracking = true;
+            isOnlyPeopleTracking = false;
+        });
+        trackPeopleBtn.setOnClickListener(v -> {
+            isOneObjectTracking.set(false);
+            isOnlyCarsTracking = false;
+            isOnlyPeopleTracking = true;
+        });
+
+        ImageView screen = findViewById(R.id.videoPlayer);
 
         isStoragePermissionGranted();
 
-//        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
 
         // Realtime cam stream
         /*Thread thread = new Thread(() -> {
@@ -185,9 +201,9 @@ public class MainActivity extends AppCompatActivity {
         thread.start();*/
 
         // From video
-        Thread thread = new Thread(() -> {
+        @SuppressLint("ClickableViewAccessibility") Thread thread = new Thread(() -> {
             // initLocal
-            if (OpenCVLoader.initLocal()) {
+            if (OpenCVLoader.initDebug()) {
                 Log.i(TAG, "OpenCV loaded successfully");
             } else {
                 Log.e(TAG, "OpenCV initialization failed!");
@@ -229,49 +245,111 @@ public class MainActivity extends AppCompatActivity {
                 if (videoCapture.isOpened()) {
                     Mat frame = new Mat();
 
-                    int framesCount = 30;
+                    int framesCount = 0;
 
                     Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
-                    yolov8ncnn.loadModel(getAssets(), 1, 0);
+                    yolov8ncnn.loadModel(getAssets(), 1, 1);
 
                     ArrayList<DetectObject> objects = new ArrayList<>();
 
+                    screen.setOnTouchListener((v, event) -> {
+                                int x = (int) event.getX();
+                                int y = (int) event.getY();
+
+                                // Is any object from objects is clicked.
+                                for (DetectObject object : objects) {
+
+                                    if ((object.rect.x < x && x < (object.rect.x + object.rect.width)) &&
+                                            (object.rect.y < y && y < (object.rect.y + object.rect.height))) {
+                                        Log.i(TAG, "onCreate: FOUND!!!");
+
+                                        for (DetectObject object2 : objects) {
+                                            object2.setTracking(false);
+                                        }
+
+                                        object.setTracking(true);
+
+                                        isOneObjectTracking.set(true);
+                                        isOnlyCarsTracking = false;
+                                        isOnlyPeopleTracking = false;
+
+                                        break;
+                                    }
+                                }
+
+                                return false;
+                            }
+                    );
+
+                    DisplayMetrics displayMetrics = new DisplayMetrics();
+                    getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+                    int windowHeight = displayMetrics.heightPixels;
+                    int windowWidth = displayMetrics.widthPixels;
+
                     while (videoCapture.read(frame)) {
+                        // Resize frame to phone window size. Save aspect ratio
+                        int frameHeight = frame.rows();
+                        int frameWidth = frame.cols();
+                        float frameAspectRatio = (float) frameWidth / frameHeight;
+                        resize(frame, frame, new Size((int) (windowHeight * frameAspectRatio), windowHeight));
 
-//                        ArrayList<DetectObject> objects = new ArrayList<>();
-                        if (framesCount >= 30) {
-                            Log.i(TAG, "Detect!");
-                            DetectObject[] detectObjects = yolov8ncnn.detect(frame.getNativeObjAddr());
 
-                            objects.clear();
+                        DetectObject[] detectObjectsInput = yolov8ncnn.detect(frame.getNativeObjAddr());
+                        ArrayList<DetectObject> detectObjects = new ArrayList<>(Arrays.asList(detectObjectsInput));
 
-                            for (DetectObject detectObject : detectObjects) {
-
-                                DetectObject new_object = new DetectObject(
-                                        detectObject.label, detectObject.prob, detectObject.rect);
-
-                                TrackerMIL tracker = TrackerMIL.create();
-                                tracker.init(frame, detectObject.rect);
-                                new_object.setTracker(tracker);
-
-                                objects.add(new_object);
+                        for (int i = 0; i < objects.size(); i++) {
+                            // Find center for objects[i] and find min distance between centers of detectObjects
+                            if (detectObjects.size() <= 0) {
+                                objects.remove(i);
+                                continue;
+                            }
+                            int minDistance = Integer.MAX_VALUE;
+                            int minDistanceIndex = -1;
+                            for (int j = 0; j < detectObjects.size(); j++) {
+                                if (objects.get(i).label != detectObjects.get(j).label)
+                                    continue;
+                                int distance = (int) Math.sqrt(Math.pow(objects.get(i).rect.x + objects.get(i).rect.width / 2 - detectObjects.get(j).rect.x - detectObjects.get(j).rect.width / 2, 2) + Math.pow(objects.get(i).rect.y + objects.get(i).rect.height / 2 - detectObjects.get(j).rect.y - detectObjects.get(j).rect.height / 2, 2));
+                                if (distance < minDistance) {
+                                    minDistance = distance;
+                                    minDistanceIndex = j;
+                                }
                             }
 
-                            framesCount = 0;
-                        } else {
-                            /*Log.i(TAG, "Update Trackers!");
-                            for (DetectObject object : objects) {
-                                object.tracker.update(frame, object.rect);
-                            }*/
-                            int j = 10;
-                            objects.get(j).tracker.update(frame, objects.get(j).rect);
+                            // If minDistance is less than 100, update objects[i] with detectObjects[minDistanceIndex]
+                            if (minDistance < 200) {
+                                objects.get(i).rect = detectObjects.get(minDistanceIndex).rect;
+                                objects.get(i).setLostCount(0);
+                                objects.get(i).setVisible(true);
+                                detectObjects.remove(minDistanceIndex);
+                            } else {
+                                if (objects.get(i).getLostCount() > DetectObject.lostThreshold) {
+                                    objects.remove(i);
+                                } else {
+                                    objects.get(i).addLostCount();
+                                    objects.get(i).setVisible(false);
+                                }
+                            }
                         }
 
+                        for (DetectObject detectObject : detectObjects) {
+                            objects.add(detectObject);
+                        }
 
-                        Log.i(TAG, "Draw!");
+                        framesCount = 0;
+
+
                         // Draw objects rects
                         for (DetectObject object : objects) {
-                            rectangle(frame, object.rect, new Scalar(object.getColor()), 3);
+                            if (isOneObjectTracking.get() && !object.isTracking()) continue;
+                            if (isOnlyCarsTracking &&
+                                    !object.getLabelName().equals("car") &&
+                                    !object.getLabelName().equals("truck")) continue;
+                            if (isOnlyPeopleTracking && !object.getLabelName().equals("person")) continue;
+                            if (!object.isVisible()) continue;
+
+                            rectangle(frame, new Point(object.rect.x, object.rect.y),
+                                    new Point(object.rect.x + object.rect.width, object.rect.y + object.rect.height),
+                                    new Scalar(object.getColor()), 3);
                         }
 
 
@@ -292,7 +370,7 @@ public class MainActivity extends AppCompatActivity {
 
 
                         //yolov8ncnn.detect(frame.getNativeObjAddr());
-                            //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
+                        //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
                         /*Log.i(TAG, "FrameNum: " + framesCount);
                         Bitmap nb = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
                         Log.i(TAG, "onCreate: " + );
@@ -364,16 +442,16 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             URL u = new URL(videoUrl);
-        InputStream is = u.openStream();
-        DataInputStream dis = new DataInputStream(is);
+            InputStream is = u.openStream();
+            DataInputStream dis = new DataInputStream(is);
 
-        byte[] buffer = new byte[1024];
-        int length;
+            byte[] buffer = new byte[1024];
+            int length;
 
-        FileOutputStream fos = new FileOutputStream(videoChunkPath);
-        while ((length = dis.read(buffer)) > 0) {
-            fos.write(buffer, 0, length);
-        }
+            FileOutputStream fos = new FileOutputStream(videoChunkPath);
+            while ((length = dis.read(buffer)) > 0) {
+                fos.write(buffer, 0, length);
+            }
         } catch (MalformedURLException e) {
             throw new RuntimeException(e);
         } catch (FileNotFoundException e) {
