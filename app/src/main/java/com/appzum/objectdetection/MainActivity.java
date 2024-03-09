@@ -1,5 +1,8 @@
 package com.appzum.objectdetection;
 
+import static org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX;
+import static org.opencv.imgproc.Imgproc.getTextSize;
+import static org.opencv.imgproc.Imgproc.putText;
 import static org.opencv.imgproc.Imgproc.rectangle;
 import static org.opencv.imgproc.Imgproc.resize;
 
@@ -15,6 +18,9 @@ import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
@@ -44,6 +50,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 // AppCompatActivity, CameraActivity
@@ -54,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     ImageView screen;
 
     boolean isVideoCapturing = true;
+    private Handler handler;
 
     String videoChunkPath1 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream1.webm";
     String videoChunkPath2 = Environment.getExternalStorageDirectory() + "/Download/object_detection_stream2.webm";
@@ -212,26 +221,20 @@ public class MainActivity extends AppCompatActivity {
         });
 
         thread.start();*/
-    }
 
+        Log.i(TAG, "onCreate: Start Handler2!");
+        handler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                // initLocal
+                if (OpenCVLoader.initDebug()) {
+                    Log.i(TAG, "OpenCV loaded successfully");
+                } else {
+                    Log.e(TAG, "OpenCV initialization failed!");
+                    return;
+                }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-
-        isVideoCapturing = true;
-
-        @SuppressLint("ClickableViewAccessibility") Thread thread = new Thread(() -> {
-            // initLocal
-            if (OpenCVLoader.initDebug()) {
-                Log.i(TAG, "OpenCV loaded successfully");
-            } else {
-                Log.e(TAG, "OpenCV initialization failed!");
-                return;
-            }
-
-            String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
-
+//            String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
 
             /*InputStream is = getResources().openRawResource(R.raw.cam_vid_1);
             File videoDir = getDir("videos", Context.MODE_PRIVATE);
@@ -257,127 +260,157 @@ public class MainActivity extends AppCompatActivity {
             }*/
 
 
-            while (isVideoCapturing) {
+                /*while (isVideoCapturing) {
 
-                VideoCapture videoCapture = new VideoCapture();
-                videoCapture.open(getAssetsPath("cam_vid_1.mp4"));
+                    VideoCapture videoCapture = new VideoCapture();
+                    videoCapture.open(getAssetsPath("cam_vid_1.mp4"));
 
-                if (videoCapture.isOpened()) {
-                    Mat frame = new Mat();
+                    Date startTime = Calendar.getInstance().getTime();
 
-                    int framesCount = 0;
+                    if (videoCapture.isOpened()) {*/
 
-                    // get model from shared preferences
-                    SharedPreferences sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
-                    int yoloModel = sharedPreferences.getInt("yoloModel", 0);
-                    boolean isGPU = sharedPreferences.getBoolean("isGPU", false);
-                    int targetSize = sharedPreferences.getInt("targetSize", 640);
+                Date startTime = Calendar.getInstance().getTime();
+                Mat frame = new Mat();
 
-                    Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
-                    yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0, targetSize);
 
-                    ArrayList<DetectObject> objects = new ArrayList<>();
+                int framesCount = 0;
+                float fps = 0;
 
-                    screen.setOnTouchListener((v, event) -> {
-                                int x = (int) event.getX();
-                                int y = (int) event.getY();
+                // get model from shared preferences
+                SharedPreferences sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
+                int yoloModel = sharedPreferences.getInt("yoloModel", 0);
+                boolean isGPU = sharedPreferences.getBoolean("isGPU", false);
+                int targetSize = sharedPreferences.getInt("targetSize", 640);
 
-                                // Is any object from objects is clicked.
-                                for (DetectObject object : objects) {
+                Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
+                yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0, targetSize);
 
-                                    if ((object.rect.x < x && x < (object.rect.x + object.rect.width)) &&
-                                            (object.rect.y < y && y < (object.rect.y + object.rect.height))) {
-                                        Log.i(TAG, "onCreate: FOUND!!!");
+                ArrayList<DetectObject> objects = new ArrayList<>();
 
-                                        for (DetectObject object2 : objects) {
-                                            object2.setTracking(false);
-                                        }
+                screen.setOnTouchListener((v, event) -> {
+                            int x = (int) event.getX();
+                            int y = (int) event.getY();
 
-                                        object.setTracking(true);
+                            // Is any object from objects is clicked.
+                            for (DetectObject object : objects) {
 
-                                        isOneObjectTracking.set(true);
-                                        isOnlyCarsTracking = false;
-                                        isOnlyPeopleTracking = false;
+                                if ((object.rect.x < x && x < (object.rect.x + object.rect.width)) &&
+                                        (object.rect.y < y && y < (object.rect.y + object.rect.height))) {
+                                    Log.i(TAG, "onCreate: FOUND!!!");
 
-                                        break;
+                                    for (DetectObject object2 : objects) {
+                                        object2.setTracking(false);
                                     }
-                                }
 
-                                return false;
-                            }
-                    );
+                                    object.setTracking(true);
 
-                    DisplayMetrics displayMetrics = new DisplayMetrics();
-                    getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-                    int windowHeight = displayMetrics.heightPixels;
-                    int windowWidth = displayMetrics.widthPixels;
+                                    isOneObjectTracking.set(true);
+                                    isOnlyCarsTracking = false;
+                                    isOnlyPeopleTracking = false;
 
-                    while (videoCapture.read(frame) && isVideoCapturing) {
-                        // Resize frame to phone window size. Save aspect ratio
-                        int frameHeight = frame.rows();
-                        int frameWidth = frame.cols();
-                        float frameAspectRatio = (float) frameWidth / frameHeight;
-                        resize(frame, frame, new Size((int) (windowHeight * frameAspectRatio), windowHeight));
-
-
-                        DetectObject[] detectObjectsInput = yolov8ncnn.detect(frame.getNativeObjAddr());
-                        ArrayList<DetectObject> detectObjects = new ArrayList<>(Arrays.asList(detectObjectsInput));
-
-                        for (int i = 0; i < objects.size(); i++) {
-                            // Find center for objects[i] and find min distance between centers of detectObjects
-                            if (detectObjects.size() <= 0) {
-                                objects.remove(i);
-                                continue;
-                            }
-                            int minDistance = Integer.MAX_VALUE;
-                            int minDistanceIndex = -1;
-                            for (int j = 0; j < detectObjects.size(); j++) {
-                                if (objects.get(i).label != detectObjects.get(j).label)
-                                    continue;
-                                int distance = (int) Math.sqrt(Math.pow(objects.get(i).rect.x + objects.get(i).rect.width / 2 - detectObjects.get(j).rect.x - detectObjects.get(j).rect.width / 2, 2) + Math.pow(objects.get(i).rect.y + objects.get(i).rect.height / 2 - detectObjects.get(j).rect.y - detectObjects.get(j).rect.height / 2, 2));
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    minDistanceIndex = j;
+                                    break;
                                 }
                             }
 
-                            // If minDistance is less than 100, update objects[i] with detectObjects[minDistanceIndex]
-                            if (minDistance < 200) {
-                                objects.get(i).rect = detectObjects.get(minDistanceIndex).rect;
-                                objects.get(i).setLostCount(0);
-                                objects.get(i).setVisible(true);
-                                detectObjects.remove(minDistanceIndex);
-                            } else {
-                                if (objects.get(i).getLostCount() > DetectObject.lostThreshold) {
-                                    objects.remove(i);
-                                } else {
-                                    objects.get(i).addLostCount();
-                                    objects.get(i).setVisible(false);
-                                }
-                            }
+                            return false;
                         }
+                );
 
-                        for (DetectObject detectObject : detectObjects) {
-                            objects.add(detectObject);
+                DisplayMetrics displayMetrics = new DisplayMetrics();
+                getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+                int windowHeight = displayMetrics.heightPixels;
+                int windowWidth = displayMetrics.widthPixels;
+
+
+                frame = (Mat) msg.obj;
+                // Resize frame to phone window size. Save aspect ratio
+                int frameHeight = frame.rows();
+                int frameWidth = frame.cols();
+                float frameAspectRatio = (float) frameWidth / frameHeight;
+                resize(frame, frame, new Size((int) (windowHeight * frameAspectRatio), windowHeight));
+
+
+                DetectObject[] detectObjectsInput = yolov8ncnn.detect(frame.getNativeObjAddr());
+                ArrayList<DetectObject> detectObjects = new ArrayList<>(Arrays.asList(detectObjectsInput));
+
+                for (int i = 0; i < objects.size(); i++) {
+                    // Find center for objects[i] and find min distance between centers of detectObjects
+                    if (detectObjects.size() <= 0) {
+                        objects.remove(i);
+                        continue;
+                    }
+                    int minDistance = Integer.MAX_VALUE;
+                    int minDistanceIndex = -1;
+                    for (int j = 0; j < detectObjects.size(); j++) {
+                        if (objects.get(i).label != detectObjects.get(j).label)
+                            continue;
+                        int distance = (int) Math.sqrt(Math.pow(objects.get(i).rect.x + objects.get(i).rect.width / 2 - detectObjects.get(j).rect.x - detectObjects.get(j).rect.width / 2, 2) + Math.pow(objects.get(i).rect.y + objects.get(i).rect.height / 2 - detectObjects.get(j).rect.y - detectObjects.get(j).rect.height / 2, 2));
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            minDistanceIndex = j;
                         }
+                    }
 
-                        framesCount = 0;
-
-
-                        // Draw objects rects
-                        for (DetectObject object : objects) {
-                            if (isOneObjectTracking.get() && !object.isTracking()) continue;
-                            if (isOnlyCarsTracking &&
-                                    !object.getLabelName().equals("car") &&
-                                    !object.getLabelName().equals("truck")) continue;
-                            if (isOnlyPeopleTracking && !object.getLabelName().equals("person"))
-                                continue;
-                            if (!object.isVisible()) continue;
-
-                            rectangle(frame, new Point(object.rect.x, object.rect.y),
-                                    new Point(object.rect.x + object.rect.width, object.rect.y + object.rect.height),
-                                    new Scalar(object.getColor()), 3);
+                    // If minDistance is less than 100, update objects[i] with detectObjects[minDistanceIndex]
+                    if (minDistance < 200) {
+                        objects.get(i).rect = detectObjects.get(minDistanceIndex).rect;
+                        objects.get(i).setLostCount(0);
+                        objects.get(i).setVisible(true);
+                        detectObjects.remove(minDistanceIndex);
+                    } else {
+                        if (objects.get(i).getLostCount() > DetectObject.lostThreshold) {
+                            objects.remove(i);
+                        } else {
+                            objects.get(i).addLostCount();
+                            objects.get(i).setVisible(false);
                         }
+                    }
+                }
+
+                for (DetectObject detectObject : detectObjects) {
+                    objects.add(detectObject);
+                }
+
+
+                // Draw objects rects
+                for (DetectObject object : objects) {
+                    if (isOneObjectTracking.get() && !object.isTracking()) continue;
+                    if (isOnlyCarsTracking &&
+                            !object.getLabelName().equals("car") &&
+                            !object.getLabelName().equals("truck")) continue;
+                    if (isOnlyPeopleTracking && !object.getLabelName().equals("person"))
+                        continue;
+                    if (!object.isVisible()) continue;
+
+                    rectangle(frame, new Point(object.rect.x, object.rect.y),
+                            new Point(object.rect.x + object.rect.width, object.rect.y + object.rect.height),
+                            new Scalar(object.getColor()), 3);
+                }
+
+
+                if (framesCount >= 5) {
+                    // Count and draw FPS
+                    Date endTime = Calendar.getInstance().getTime();
+                    long timeDiff = endTime.getTime() - startTime.getTime();
+                    startTime = endTime;
+                    fps = framesCount / (timeDiff / 1000f);
+                    fps = Math.round(fps * 100) / 100f;
+                    framesCount = 0;
+                }
+
+                // Count text width for background for text
+
+                int textWidth = (int) (getTextSize("FPS: " + fps, FONT_HERSHEY_SIMPLEX, 1, 2, null).width * 1.1);
+                int textHeight = (int) (getTextSize("FPS: " + fps, FONT_HERSHEY_SIMPLEX, 1, 2, null).height * 1);
+
+                // Draw background for text
+                rectangle(frame, new Point(10, 30 - textHeight - 2), new Point(textWidth, 30 + 2), new Scalar(0, 0, 0), -1);
+
+                // Draw text
+                putText(frame, "FPS: " + fps, new Point(10, 30), FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
+
+
+//                        putText(frame, "FPS: " + fps, new Point(10, 30), FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
 
 
                         /*HOGDescriptor hog = new HOGDescriptor();
@@ -396,8 +429,8 @@ public class MainActivity extends AppCompatActivity {
                         }*/
 
 
-                        //yolov8ncnn.detect(frame.getNativeObjAddr());
-                        //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
+                //yolov8ncnn.detect(frame.getNativeObjAddr());
+                //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
                         /*Log.i(TAG, "FrameNum: " + framesCount);
                         Bitmap nb = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
                         Log.i(TAG, "onCreate: " + );
@@ -410,25 +443,266 @@ public class MainActivity extends AppCompatActivity {
                         Imgproc.resize(frame, frame, sz);*/
 
 
-                        Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
-                        Utils.matToBitmap(frame, bitmap);
+                Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(frame, bitmap);
 
-                        runOnUiThread(() -> screen.setImageBitmap(bitmap));
+                runOnUiThread(() -> screen.setImageBitmap(bitmap));
 
-                        framesCount++;
+                framesCount++;
+            }
+
+
+        };
+
+        UdpReceiver udpReceiver = new UdpReceiver(handler);
+        Thread thread = new Thread(udpReceiver);
+        thread.start();
+    }
+
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        isVideoCapturing = true;
+        if (true) {
+            return;
+        }
+
+        Log.i(TAG, "onStart: Start Handler!");
+        handler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                // initLocal
+                if (OpenCVLoader.initDebug()) {
+                    Log.i(TAG, "OpenCV loaded successfully");
+                } else {
+                    Log.e(TAG, "OpenCV initialization failed!");
+                    return;
+                }
+
+//            String videoUrl = "/storage/emulated/0/Download/cam_vid_1.mp4";
+
+            /*InputStream is = getResources().openRawResource(R.raw.cam_vid_1);
+            File videoDir = getDir("videos", Context.MODE_PRIVATE);
+            File vidFile = new File(videoDir, "cam_vid_1.mp4");
+
+            FileOutputStream fos;
+            try {
+                fos = new FileOutputStream(vidFile);
+
+                byte buffer[] = new byte[4096];
+                int bytesRead;
+                while((bytesRead = is.read(buffer)) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                }
+
+                is.close();
+                fos.close();
+
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }*/
+
+
+                /*while (isVideoCapturing) {
+
+                    VideoCapture videoCapture = new VideoCapture();
+                    videoCapture.open(getAssetsPath("cam_vid_1.mp4"));
+
+                    Date startTime = Calendar.getInstance().getTime();
+
+                    if (videoCapture.isOpened()) {*/
+
+                Date startTime = Calendar.getInstance().getTime();
+                Mat frame = new Mat();
+
+
+                int framesCount = 0;
+                float fps = 0;
+
+                // get model from shared preferences
+                SharedPreferences sharedPreferences = getSharedPreferences("settings", MODE_PRIVATE);
+                int yoloModel = sharedPreferences.getInt("yoloModel", 0);
+                boolean isGPU = sharedPreferences.getBoolean("isGPU", false);
+                int targetSize = sharedPreferences.getInt("targetSize", 640);
+
+                Yolov8Ncnn yolov8ncnn = new Yolov8Ncnn();
+                yolov8ncnn.loadModel(getAssets(), yoloModel, isGPU ? 1 : 0, targetSize);
+
+                ArrayList<DetectObject> objects = new ArrayList<>();
+
+                screen.setOnTouchListener((v, event) -> {
+                            int x = (int) event.getX();
+                            int y = (int) event.getY();
+
+                            // Is any object from objects is clicked.
+                            for (DetectObject object : objects) {
+
+                                if ((object.rect.x < x && x < (object.rect.x + object.rect.width)) &&
+                                        (object.rect.y < y && y < (object.rect.y + object.rect.height))) {
+                                    Log.i(TAG, "onCreate: FOUND!!!");
+
+                                    for (DetectObject object2 : objects) {
+                                        object2.setTracking(false);
+                                    }
+
+                                    object.setTracking(true);
+
+                                    isOneObjectTracking.set(true);
+                                    isOnlyCarsTracking = false;
+                                    isOnlyPeopleTracking = false;
+
+                                    break;
+                                }
+                            }
+
+                            return false;
+                        }
+                );
+
+                DisplayMetrics displayMetrics = new DisplayMetrics();
+                getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+                int windowHeight = displayMetrics.heightPixels;
+                int windowWidth = displayMetrics.widthPixels;
+
+
+                frame = (Mat) msg.obj;
+                // Resize frame to phone window size. Save aspect ratio
+                int frameHeight = frame.rows();
+                int frameWidth = frame.cols();
+                float frameAspectRatio = (float) frameWidth / frameHeight;
+                resize(frame, frame, new Size((int) (windowHeight * frameAspectRatio), windowHeight));
+
+
+                DetectObject[] detectObjectsInput = yolov8ncnn.detect(frame.getNativeObjAddr());
+                ArrayList<DetectObject> detectObjects = new ArrayList<>(Arrays.asList(detectObjectsInput));
+
+                for (int i = 0; i < objects.size(); i++) {
+                    // Find center for objects[i] and find min distance between centers of detectObjects
+                    if (detectObjects.size() <= 0) {
+                        objects.remove(i);
+                        continue;
+                    }
+                    int minDistance = Integer.MAX_VALUE;
+                    int minDistanceIndex = -1;
+                    for (int j = 0; j < detectObjects.size(); j++) {
+                        if (objects.get(i).label != detectObjects.get(j).label)
+                            continue;
+                        int distance = (int) Math.sqrt(Math.pow(objects.get(i).rect.x + objects.get(i).rect.width / 2 - detectObjects.get(j).rect.x - detectObjects.get(j).rect.width / 2, 2) + Math.pow(objects.get(i).rect.y + objects.get(i).rect.height / 2 - detectObjects.get(j).rect.y - detectObjects.get(j).rect.height / 2, 2));
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            minDistanceIndex = j;
+                        }
                     }
 
-                } else {
-                    // Обработка ошибки открытия видео
+                    // If minDistance is less than 100, update objects[i] with detectObjects[minDistanceIndex]
+                    if (minDistance < 200) {
+                        objects.get(i).rect = detectObjects.get(minDistanceIndex).rect;
+                        objects.get(i).setLostCount(0);
+                        objects.get(i).setVisible(true);
+                        detectObjects.remove(minDistanceIndex);
+                    } else {
+                        if (objects.get(i).getLostCount() > DetectObject.lostThreshold) {
+                            objects.remove(i);
+                        } else {
+                            objects.get(i).addLostCount();
+                            objects.get(i).setVisible(false);
+                        }
+                    }
+                }
+
+                for (DetectObject detectObject : detectObjects) {
+                    objects.add(detectObject);
                 }
 
 
-                videoCapture.release();
+                // Draw objects rects
+                for (DetectObject object : objects) {
+                    if (isOneObjectTracking.get() && !object.isTracking()) continue;
+                    if (isOnlyCarsTracking &&
+                            !object.getLabelName().equals("car") &&
+                            !object.getLabelName().equals("truck")) continue;
+                    if (isOnlyPeopleTracking && !object.getLabelName().equals("person"))
+                        continue;
+                    if (!object.isVisible()) continue;
 
+                    rectangle(frame, new Point(object.rect.x, object.rect.y),
+                            new Point(object.rect.x + object.rect.width, object.rect.y + object.rect.height),
+                            new Scalar(object.getColor()), 3);
+                }
+
+
+                if (framesCount >= 5) {
+                    // Count and draw FPS
+                    Date endTime = Calendar.getInstance().getTime();
+                    long timeDiff = endTime.getTime() - startTime.getTime();
+                    startTime = endTime;
+                    fps = framesCount / (timeDiff / 1000f);
+                    fps = Math.round(fps * 100) / 100f;
+                    framesCount = 0;
+                }
+
+                // Count text width for background for text
+
+                int textWidth = (int) (getTextSize("FPS: " + fps, FONT_HERSHEY_SIMPLEX, 1, 2, null).width * 1.1);
+                int textHeight = (int) (getTextSize("FPS: " + fps, FONT_HERSHEY_SIMPLEX, 1, 2, null).height * 1);
+
+                // Draw background for text
+                rectangle(frame, new Point(10, 30 - textHeight - 2), new Point(textWidth, 30 + 2), new Scalar(0, 0, 0), -1);
+
+                // Draw text
+                putText(frame, "FPS: " + fps, new Point(10, 30), FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
+
+
+//                        putText(frame, "FPS: " + fps, new Point(10, 30), FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
+
+
+                        /*HOGDescriptor hog = new HOGDescriptor();
+                        //Получаем стандартный определитель людей и устанавливаем его нашему дескриптору
+                        MatOfFloat descriptors = HOGDescriptor.getDefaultPeopleDetector();
+                        hog.setSVMDetector(descriptors);
+                        // Определяем переменные, в которые будут помещены результаты поиска ( locations - прямоугольные области, weights - вес (можно сказать релевантность) соответствующей локации)
+                        MatOfRect locations = new MatOfRect();
+                        MatOfDouble weights = new MatOfDouble();
+                        // Собственно говоря, сам анализ фотографий. Результаты запишутся в locations и weights
+                        hog.detectMultiScale(frame, locations, weights);
+
+                        for (Rect car : locations.toArray()) {
+                            //Log.i(TAG, "Rect: " + car.x + " " + car.y + " " + car.height + " " + car.width);
+                            Imgproc.rectangle(frame, car, new Scalar(255, 0, 0));
+                        }*/
+
+
+                //yolov8ncnn.detect(frame.getNativeObjAddr());
+                //Mat processed_frame = new Mat(yolov8ncnn.detect(frame.clone().getNativeObjAddr()));
+                        /*Log.i(TAG, "FrameNum: " + framesCount);
+                        Bitmap nb = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
+                        Log.i(TAG, "onCreate: " + );
+                        //nb.setPixels(yolov8ncnn.detect(frame.getNativeObjAddr()), 0, frame.cols(), 0, 0, frame.cols(), frame.rows());
+
+                        Mat processed_frame = frame;
+                        long x = 100;*/
+
+                        /*Size sz = new Size(720,720);
+                        Imgproc.resize(frame, frame, sz);*/
+
+
+                Bitmap bitmap = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(frame, bitmap);
+
+                runOnUiThread(() -> screen.setImageBitmap(bitmap));
+
+                framesCount++;
             }
 
-        });
 
+        };
+
+        UdpReceiver udpReceiver = new UdpReceiver(handler);
+        Thread thread = new Thread(udpReceiver);
         thread.start();
     }
 
@@ -436,7 +710,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        isVideoCapturing = false;
+//        isVideoCapturing = false;
         Log.i(TAG, "onStop: 11");
     }
 
@@ -515,3 +789,4 @@ public class MainActivity extends AppCompatActivity {
         return "";
     }
 }
+
